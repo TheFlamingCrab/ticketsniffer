@@ -16,7 +16,9 @@ def hashcat_format_krb5pa(etype, user, realm, ciphertext):
     if etype=='17' or etype=='18':
         return f'$krb5pa${etype}${user}${realm}${ciphertext}'
     elif etype=='23':
-        return f'$krb5pa$23$user$realm$salt${cipher}'
+        salt = ciphertext[:32]
+        cipher = ciphertext[32:]
+        return f'$krb5pa${etype}${user}${realm}${salt}${cipher}'
 
 def capture_kerberos_tickets_from_file(filename):
     print(f'Reading kerberos tickets from file {filename}')
@@ -24,11 +26,15 @@ def capture_kerberos_tickets_from_file(filename):
     for packet in cap:
         if 'Kerberos' in packet:
             if packet.kerberos.msg_type == '13':
+                continue
                 etype = packet.kerberos.etype
                 realm = packet.kerberos.realm
-                spn_part_1 = packet.kerberos.snamestring.all_fields[0].get_default_value()
-                spn_part_2 = packet.kerberos.snamestring.all_fields[1].get_default_value()
-                spn = f'{spn_part_1}/{spn_part_2}'
+                if len(packet.kerberos.snamestring) >= 2:
+                    spn_part_1 = packet.kerberos.snamestring.all_fields[0].get_default_value()
+                    spn_part_2 = packet.kerberos.snamestring.all_fields[1].get_default_value()
+                    spn = f'{spn_part_1}/{spn_part_2}'
+                else:
+                    spn = packet.kerberos.snamestring
                 ciphertext = packet.kerberos.cipher.replace(':', '').upper()
                 print(hashcat_format_krb5tgs(etype, realm, spn, ciphertext))
 
@@ -40,14 +46,17 @@ def capture_kerberos_tickets_live(interface):
             if packet.kerberos.msg_type == '13':
                 etype = packet.kerberos.etype
                 realm = packet.kerberos.realm
-                spn_part_1 = packet.kerberos.snamestring.all_fields[0].get_default_value()
-                spn_part_2 = packet.kerberos.snamestring.all_fields[1].get_default_value()
-                spn = f'{spn_part_1}/{spn_part_2}'
+                if len(packet.kerberos.snamestring) >= 2:
+                    spn_part_1 = packet.kerberos.snamestring.all_fields[0].get_default_value()
+                    spn_part_2 = packet.kerberos.snamestring.all_fields[1].get_default_value()
+                    spn = f'{spn_part_1}/{spn_part_2}'
+                else:
+                    spn = packet.kerberos.snamestring
                 ciphertext = packet.kerberos.cipher.replace(':', '').upper()
                 print(hashcat_format_krb5tgs(etype, realm, spn, ciphertext))
 
 def main():
-    parser = argparse.ArgumentParser(description="Capture and process Kerberos tickets.")
+    parser = argparse.ArgumentParser(description="Capture and process TGS-REP Kerberos tickets.")
     
     subparsers = parser.add_subparsers(dest='command', help='Subcommand to run')
 
