@@ -26,7 +26,6 @@ def capture_kerberos_tickets_from_file(filename):
     for packet in cap:
         if 'Kerberos' in packet:
             if packet.kerberos.msg_type == '13':
-                continue
                 etype = packet.kerberos.etype
                 realm = packet.kerberos.realm
                 if len(packet.kerberos.snamestring) >= 2:
